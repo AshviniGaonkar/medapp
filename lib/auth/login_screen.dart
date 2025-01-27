@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:medapp/auth/login_form.dart';
+import 'package:medapp/auth/login_screen_top_image.dart';
+import 'package:medapp/components/background.dart';
+import 'package:medapp/responsive.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -12,7 +16,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
 
-  // Check if user is already logged in
   @override
   void initState() {
     super.initState();
@@ -36,7 +39,6 @@ class _LoginScreenState extends State<LoginScreen> {
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
-
       Navigator.pushReplacementNamed(context, "/Main");
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -51,63 +53,79 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text("Faculty Login")),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+    return Background(
+      child: SingleChildScrollView(
+        child: Responsive(
+          mobile: MobileLoginScreen(
+            formKey: _formKey,
+            emailController: emailController,
+            passwordController: passwordController,
+            isLoading: _isLoading,
+            onLogin: login,
+          ),
+          desktop: Row(
             children: [
-              Text("Welcome Back!", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-              SizedBox(height: 20),
-              TextFormField(
-                controller: emailController,
-                decoration: InputDecoration(labelText: "Email", border: OutlineInputBorder()),
-                keyboardType: TextInputType.emailAddress,
-                validator: (value) {
-                  if (value == null || value.isEmpty) return "Enter email";
-                  if (!RegExp(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$").hasMatch(value)) {
-                    return "Enter a valid email";
-                  }
-                  return null;
-                },
-              ),
-              SizedBox(height: 16),
-              TextFormField(
-                controller: passwordController,
-                decoration: InputDecoration(labelText: "Password", border: OutlineInputBorder()),
-                obscureText: true,
-                validator: (value) {
-                  if (value == null || value.isEmpty) return "Enter password";
-                  if (value.length < 6) return "Password must be 6+ chars";
-                  return null;
-                },
-              ),
-              SizedBox(height: 20),
-              _isLoading
-                  ? CircularProgressIndicator()
-                  : ElevatedButton(
-                      onPressed: login,
-                      child: Text("Login"),
-                      style: ElevatedButton.styleFrom(
-                        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-                      ),
+              Expanded(child: LoginScreenTopImage()),
+              Expanded(
+                child: Center(
+                  child: SizedBox(
+                    width: 450,
+                    child: LoginForm(
+                      formKey: _formKey,
+                      emailController: emailController,
+                      passwordController: passwordController,
+                      isLoading: _isLoading,
+                      onLogin: login,
                     ),
-              SizedBox(height: 10),
-              TextButton(
-                onPressed: () => Navigator.pushNamed(context, "/forgot-password"),
-                child: Text("Forgot Password?"),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pushNamed(context, "/signup"),
-                child: Text("Don't have an account? Sign up"),
+                  ),
+                ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class MobileLoginScreen extends StatelessWidget {
+  final GlobalKey<FormState> formKey;
+  final TextEditingController emailController;
+  final TextEditingController passwordController;
+  final bool isLoading;
+  final VoidCallback onLogin;
+
+  const MobileLoginScreen({
+    required this.formKey,
+    required this.emailController,
+    required this.passwordController,
+    required this.isLoading,
+    required this.onLogin,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: <Widget>[
+        LoginScreenTopImage(),
+        Row(
+          children: [
+            Spacer(),
+            Expanded(
+              flex: 8,
+              child: LoginForm(
+                formKey: formKey,
+                emailController: emailController,
+                passwordController: passwordController,
+                isLoading: isLoading,
+                onLogin: onLogin,
+              ),
+            ),
+            Spacer(),
+          ],
+        ),
+      ],
     );
   }
 }

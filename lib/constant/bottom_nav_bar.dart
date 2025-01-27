@@ -28,7 +28,7 @@ class BottomNavBar extends StatelessWidget {
           onTabChange: onTabChange,
           tabs: [
             GButton(icon: Icons.home, text: "Home"),
-            GButton(icon: Icons.event, text: "events"),
+            GButton(icon: Icons.event, text: "Events"),
             GButton(icon: Icons.man_3_rounded, text: "Attendance"),
             GButton(icon: Icons.dashboard, text: "Dashboard"),
             

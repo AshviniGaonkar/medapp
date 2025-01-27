@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:medapp/pages/mark_attendance.dart';
 
 class EventsScreen extends StatefulWidget {
   @override
@@ -6,7 +8,8 @@ class EventsScreen extends StatefulWidget {
 }
 
 class _EventsScreenState extends State<EventsScreen> {
-  List<Map<String, String>> _events = [];
+  final CollectionReference eventsCollection =
+      FirebaseFirestore.instance.collection("events");
 
   void _addEvent() {
     TextEditingController nameController = TextEditingController();
@@ -45,13 +48,11 @@ class _EventsScreenState extends State<EventsScreen> {
                 if (nameController.text.isNotEmpty &&
                     timeController.text.isNotEmpty &&
                     locationController.text.isNotEmpty) {
-                  setState(() {
-                    _events.add({
-                      "name": nameController.text,
-                      "time": timeController.text,
-                      "location": locationController.text,
-                    });
-                  });
+                  _saveEventToFirestore(
+                    nameController.text,
+                    timeController.text,
+                    locationController.text,
+                  );
                   Navigator.pop(context);
                 }
               },
@@ -63,10 +64,26 @@ class _EventsScreenState extends State<EventsScreen> {
     );
   }
 
+Future<void> _saveEventToFirestore(String name, String time, String location) async {
+  try {
+    await eventsCollection.add({
+      "name": name,
+      "time": time,
+      "location": location,
+      "createdAt": FieldValue.serverTimestamp(),
+    });
+    print("Event added successfully!");
+  } catch (e) {
+    print("Error adding event: $e");
+  }
+}
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: Text("Events"),
       ),
       body: Padding(
@@ -82,18 +99,30 @@ class _EventsScreenState extends State<EventsScreen> {
               ],
             ),
             Expanded(
-              child: _events.isEmpty
-                  ? Center(child: Text("No Events Yet! Click + to add events."))
-                  : ListView.builder(
-                      itemCount: _events.length,
-                      itemBuilder: (context, index) {
-                        return _eventTile(
-                          _events[index]["name"]!,
-                          _events[index]["time"]!,
-                          _events[index]["location"]!,
-                        );
-                      },
-                    ),
+              child: StreamBuilder<QuerySnapshot>(
+                stream: eventsCollection.orderBy("createdAt", descending: true).snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Center(child: CircularProgressIndicator());
+                  }
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return Center(child: Text("No Events Yet! Click + to add events."));
+                  }
+
+                  return ListView.builder(
+                    itemCount: snapshot.data!.docs.length,
+                    itemBuilder: (context, index) {
+                      var event = snapshot.data!.docs[index];
+                      return _eventTile(
+                        event.id,
+                        event["name"],
+                        event["time"],
+                        event["location"],
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ],
         ),
@@ -105,30 +134,25 @@ class _EventsScreenState extends State<EventsScreen> {
       ),
     );
   }
+  Widget _eventTile(String eventId, String name, String time, String location) {
+  return Card(
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    child: ListTile(
+      leading: Icon(Icons.event, color: Colors.blue),
+      title: Text(name, style: TextStyle(fontWeight: FontWeight.bold)),
+      subtitle: Text("$time | $location"),
+      trailing: Icon(Icons.arrow_forward_ios, size: 18),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MarkAttendanceScreen(eventId: eventId, eventName: name),
+          ),
+        );
+      },
+    ),
+  );
+}
 
-  Widget _actionButton(IconData icon, String text) {
-    return Column(
-      children: [
-        CircleAvatar(
-          backgroundColor: Colors.blue.shade100,
-          radius: 30,
-          child: Icon(icon, color: Colors.blue, size: 30),
-        ),
-        SizedBox(height: 5),
-        Text(text, textAlign: TextAlign.center, style: TextStyle(fontSize: 14)),
-      ],
-    );
-  }
 
-  Widget _eventTile(String name, String time, String location) {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: ListTile(
-        leading: Icon(Icons.event, color: Colors.blue),
-        title: Text(name, style: TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text("$time | $location"),
-        trailing: Icon(Icons.arrow_forward_ios, size: 18),
-      ),
-    );
-  }
 }

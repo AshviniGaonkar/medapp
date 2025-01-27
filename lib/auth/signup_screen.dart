@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:medapp/auth/sign_up_top_image.dart';
+import 'package:medapp/auth/signup_form.dart';
+import 'package:medapp/components/background.dart';
+import 'package:medapp/responsive.dart';
+
 
 class SignUpScreen extends StatefulWidget {
   @override
@@ -11,12 +16,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmPasswordController =
-      TextEditingController();
+  final TextEditingController confirmPasswordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
 
-  // Function to handle user sign-up
   Future<void> signUp() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -26,19 +29,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     try {
       // Create user in Firebase Auth
-      UserCredential userCredential =
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
 
-      String uid = userCredential.user!.uid; // Get UID of the faculty
+      String uid = userCredential.user!.uid;
 
       // Store faculty details in Firestore
       await FirebaseFirestore.instance.collection('faculty').doc(uid).set({
         'name': nameController.text.trim(),
         'email': emailController.text.trim(),
-        'created_at': FieldValue.serverTimestamp(), // Stores current timestamp
+        'created_at': FieldValue.serverTimestamp(),
       });
 
       // Navigate to Login Screen
@@ -60,133 +62,93 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text("Faculty Sign Up")),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Form(
-            key: _formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    "Create Account",
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 20),
-
-                  // Name Field
-                  TextFormField(
-                    controller: nameController,
-                    decoration: InputDecoration(
-                      labelText: "Full Name",
-                      border: OutlineInputBorder(),
+    return Background(
+      child: SingleChildScrollView(
+        child: Responsive(
+          mobile: MobileSignupScreen(
+            formKey: _formKey,
+            nameController: nameController,
+            emailController: emailController,
+            passwordController: passwordController,
+            confirmPasswordController: confirmPasswordController,
+            isLoading: _isLoading,
+            onSignUp: signUp,
+          ),
+          desktop: Row(
+            children: [
+              Expanded(child: SignUpScreenTopImage()),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 450,
+                      child: SignUpForm(
+                        formKey: _formKey,
+                        nameController: nameController,
+                        emailController: emailController,
+                        passwordController: passwordController,
+                        confirmPasswordController: confirmPasswordController,
+                        isLoading: _isLoading,
+                        onSignUp: signUp,
+                      ),
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return "Please enter your full name.";
-                      }
-                      return null;
-                    },
-                  ),
-                  SizedBox(height: 16),
-
-                  // Email Field
-                  TextFormField(
-                    controller: emailController,
-                    decoration: InputDecoration(
-                      labelText: "Email",
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return "Please enter your email.";
-                      }
-                      if (!RegExp(
-                              r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
-                          .hasMatch(value)) {
-                        return "Please enter a valid email.";
-                      }
-                      return null;
-                    },
-                  ),
-                  SizedBox(height: 16),
-
-                  // Password Field
-                  TextFormField(
-                    controller: passwordController,
-                    decoration: InputDecoration(
-                      labelText: "Password",
-                      border: OutlineInputBorder(),
-                    ),
-                    obscureText: true,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return "Please enter your password.";
-                      }
-                      if (value.length < 6) {
-                        return "Password must be at least 6 characters.";
-                      }
-                      return null;
-                    },
-                  ),
-                  SizedBox(height: 16),
-
-                  // Confirm Password Field
-                  TextFormField(
-                    controller: confirmPasswordController,
-                    decoration: InputDecoration(
-                      labelText: "Confirm Password",
-                      border: OutlineInputBorder(),
-                    ),
-                    obscureText: true,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return "Please confirm your password.";
-                      }
-                      if (value != passwordController.text) {
-                        return "Passwords do not match.";
-                      }
-                      return null;
-                    },
-                  ),
-                  SizedBox(height: 20),
-
-                  // Sign-Up Button
-                  _isLoading
-                      ? CircularProgressIndicator()
-                      : ElevatedButton(
-                          onPressed: signUp,
-                          child: Text("Sign Up"),
-                          style: ElevatedButton.styleFrom(
-                            padding: EdgeInsets.symmetric(
-                                vertical: 12, horizontal: 24),
-                            textStyle: TextStyle(fontSize: 16),
-                          ),
-                        ),
-                  SizedBox(height: 10),
-
-                  // Already have an account? Login button
-                  TextButton(
-                    onPressed: () {
-                      // Navigate before setting loading state
-                      Navigator.pushReplacementNamed(context, "/login");
-
-                      setState(() {
-                        _isLoading = false;
-                      });
-                    },
-                    child: Text("Already have an account? Login"),
-                  ),
-                ],
-              ),
-            ),
+                    SizedBox(height: 16),
+                  ],
+                ),
+              )
+            ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class MobileSignupScreen extends StatelessWidget {
+  final GlobalKey<FormState> formKey;
+  final TextEditingController nameController;
+  final TextEditingController emailController;
+  final TextEditingController passwordController;
+  final TextEditingController confirmPasswordController;
+  final bool isLoading;
+  final VoidCallback onSignUp;
+
+  const MobileSignupScreen({
+    required this.formKey,
+    required this.nameController,
+    required this.emailController,
+    required this.passwordController,
+    required this.confirmPasswordController,
+    required this.isLoading,
+    required this.onSignUp,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: <Widget>[
+        SignUpScreenTopImage(),
+        Row(
+          children: [
+            Spacer(),
+            Expanded(
+              flex: 8,
+              child: SignUpForm(
+                formKey: formKey,
+                nameController: nameController,
+                emailController: emailController,
+                passwordController: passwordController,
+                confirmPasswordController: confirmPasswordController,
+                isLoading: isLoading,
+                onSignUp: onSignUp,
+              ),
+            ),
+            Spacer(),
+          ],
+        ),
+      ],
     );
   }
 }
