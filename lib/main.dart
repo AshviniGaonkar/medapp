@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:medapp/Welcome/components/students_login_screen.dart';
 import 'package:medapp/Welcome/welcome_screen.dart';
 import 'package:medapp/main_screen.dart';
@@ -10,6 +11,7 @@ import 'package:medapp/pages/home_page.dart';
 import 'auth/login_screen.dart';
 import 'auth/signup_screen.dart';
 import 'pages/dashboard_screen.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 // Constants for styling
 const kPrimaryColor = Color(0xFF6F35A5);
@@ -19,6 +21,11 @@ const defaultPadding = 16.0;
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  WidgetsFlutterBinding.ensureInitialized();
+  await Hive.initFlutter();
+  await Hive.openBox('events'); // Box for events
+  await Hive.openBox('attendance');
+  await dotenv.load(fileName: ".env"); 
   runApp(MyApp());
 }
 

@@ -1,63 +1,138 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:hive/hive.dart';
+import 'package:path_provider/path_provider.dart';
 
 class MarkAttendanceScreen extends StatefulWidget {
   final String eventId;
   final String eventName;
+  final String eventDate;
 
-  MarkAttendanceScreen({required this.eventId, required this.eventName});
+  MarkAttendanceScreen({required this.eventId, required this.eventName, required this.eventDate});
 
   @override
   _MarkAttendanceScreenState createState() => _MarkAttendanceScreenState();
 }
 
 class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
-  final CollectionReference studentsCollection =
-      FirebaseFirestore.instance.collection("students");
+  late Box attendanceBox;
+  late Box studentBox;
 
-  final CollectionReference attendanceCollection =
-      FirebaseFirestore.instance.collection("events");
+  Map<String, bool> attendanceStatus = {};
+  List<Map<String, dynamic>> students = [];
+  bool isAttendanceSubmitted = false;
 
-  Map<String, bool> attendanceStatus = {}; // Stores students' attendance status
+
+final String baseUrl = dotenv.env['BASE_URL'] ?? 'http://default-url.com';
 
   @override
   void initState() {
     super.initState();
+    _initHive();
+  }
+
+  // Initialize Hive and open required boxes
+  Future<void> _initHive() async {
+    final appDir = await getApplicationDocumentsDirectory();
+    Hive.init(appDir.path);
+    attendanceBox = await Hive.openBox('attendance');
+    studentBox = await Hive.openBox('students');
+
+    await _fetchStudents();
     _loadAttendance();
   }
 
-  Future<void> _loadAttendance() async {
-    QuerySnapshot attendanceSnapshot = await attendanceCollection
-        .doc(widget.eventId)
-        .collection("attendance")
-        .get();
+  // Fetch students from API and save to Hive for offline access
+  Future<void> _fetchStudents() async {
+    final url = Uri.parse("$baseUrl/students");
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        List<dynamic> data = json.decode(response.body);
+        setState(() {
+          students = data.cast<Map<String, dynamic>>();
+        });
 
-    Map<String, bool> tempStatus = {};
-    for (var doc in attendanceSnapshot.docs) {
-      tempStatus[doc.id] = doc["present"];
+        // Store students in Hive
+        studentBox.put("students_data", students);
+      }
+    } catch (e) {
+      print("⚠️ Error fetching students: $e");
+
+      // Load students from Hive if API request fails (offline mode)
+      var storedStudents = studentBox.get("students_data");
+      if (storedStudents != null) {
+        setState(() {
+          students = List<Map<String, dynamic>>.from(storedStudents);
+        });
+      }
     }
+  }
 
-    setState(() {
-      attendanceStatus = tempStatus;
+  // Load attendance data from Hive
+  void _loadAttendance() {
+    String eventKey = "attendance_${widget.eventId}";
+    var storedData = attendanceBox.get(eventKey);
+
+    if (storedData != null) {
+      setState(() {
+        attendanceStatus = Map<String, bool>.from(storedData['attendanceData']);
+        isAttendanceSubmitted = storedData['submitted'];
+      });
+    }
+  }
+
+  // Save attendance locally for offline use
+  void _saveAttendanceLocally() {
+    String eventKey = "attendance_${widget.eventId}";
+    attendanceBox.put(eventKey, {
+      "attendanceData": attendanceStatus,
+      "submitted": isAttendanceSubmitted,
     });
   }
 
-  void _toggleAttendance(String studentId, bool isPresent) async {
-    await attendanceCollection
-        .doc(widget.eventId)
-        .collection("attendance")
-        .doc(studentId)
-        .set({"present": isPresent});
+  // Submit attendance to server and save locally
+  Future<void> _submitAttendance() async {
+    final url = Uri.parse("$baseUrl/attendance/submit");
 
-    setState(() {
-      attendanceStatus[studentId] = isPresent;
-    });
+    List<Map<String, dynamic>> attendanceList = attendanceStatus.entries.map((entry) {
+      return {
+        "studentId": entry.key,
+        "present": entry.value,
+        "eventDate": widget.eventDate,
+      };
+    }).toList();
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: json.encode({"eventId": widget.eventId, "attendanceData": attendanceList}),
+      );
+
+      if (response.statusCode == 200) {
+        print("✅ Attendance submitted successfully!");
+        setState(() {
+          isAttendanceSubmitted = true;
+        });
+
+        _saveAttendanceLocally(); // Save attendance in Hive
+
+        Future.delayed(Duration(seconds: 1), () {
+          Navigator.pop(context);
+        });
+      }
+    } catch (e) {
+      print("❌ Error submitting attendance: $e");
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     int presentCount = attendanceStatus.values.where((status) => status).length;
-    int absentCount = attendanceStatus.length - presentCount;
+    int absentCount = students.length - presentCount;
 
     return Scaffold(
       appBar: AppBar(title: Text("Mark Attendance - ${widget.eventName}")),
@@ -74,36 +149,37 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
               ],
             ),
             SizedBox(height: 10),
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: studentsCollection.snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(child: CircularProgressIndicator());
-                  }
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return Center(child: Text("No students available."));
-                  }
-
-                  var studentDocs = snapshot.data!.docs;
-
-                  return ListView.builder(
-                    itemCount: studentDocs.length,
-                    itemBuilder: (context, index) {
-                      var student = studentDocs[index];
-                      String studentId = student.id;
-                      String studentName = student["name"];
-                      bool isPresent = attendanceStatus[studentId] ?? false;
-
-                      return _studentAttendanceTile(studentName, index + 1, isPresent, studentId);
-                    },
-                  );
-                },
+            Expanded(child: _buildStudentList()),
+            if (!isAttendanceSubmitted)
+              ElevatedButton(
+                onPressed: _submitAttendance,
+                child: Text("Submit Attendance"),
+                style: ElevatedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(vertical: 16), backgroundColor: Colors.blue,
+                  textStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
               ),
-            ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildStudentList() {
+    if (students.isEmpty) {
+      return Center(child: CircularProgressIndicator());
+    }
+
+    return ListView.builder(
+      itemCount: students.length,
+      itemBuilder: (context, index) {
+        var student = students[index];
+        String studentId = student["_id"];
+        String studentName = student["name"];
+        bool isPresent = attendanceStatus[studentId] ?? false;
+
+        return _studentAttendanceTile(studentName, index + 1, isPresent, studentId);
+      },
     );
   }
 
@@ -127,8 +203,11 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
       child: ListTile(
         leading: Checkbox(
           value: isPresent,
-          onChanged: (bool? newValue) {
-            _toggleAttendance(studentId, newValue ?? false);
+          onChanged: isAttendanceSubmitted ? null : (bool? newValue) {
+            setState(() {
+              attendanceStatus[studentId] = newValue ?? false;
+              _saveAttendanceLocally(); // Save instantly on change
+            });
           },
         ),
         title: Text(name, style: TextStyle(fontWeight: FontWeight.bold)),
