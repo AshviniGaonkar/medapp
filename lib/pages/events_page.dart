@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:medapp/dbhelper/database_helper.dart';
 import 'dart:convert';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:medapp/pages/mark_attendance.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 
 class EventsScreen extends StatefulWidget {
   @override
@@ -12,8 +12,7 @@ class EventsScreen extends StatefulWidget {
 }
 
 class _EventsScreenState extends State<EventsScreen> {
-  late String baseUrl;
-  late String apiUrl;
+  final String apiUrl = "http://192.168.36.131:5000/events";
   List<Map<String, dynamic>> eventList = [];
 
   // Controllers for text fields
@@ -25,24 +24,18 @@ class _EventsScreenState extends State<EventsScreen> {
   @override
   void initState() {
     super.initState();
-    baseUrl = dotenv.env['BASE_URL'] ?? 'http://default-url.com';
-    apiUrl = "$baseUrl/events"; // Now apiUrl is initialized properly
     _fetchEvents();
   }
 
-  /// Fetch events from API or load cached data from Hive
+  /// Fetch events from API or load cached data from SQLite
   Future<void> _fetchEvents() async {
-    final box = Hive.box('events');
-
     // Load cached events first
-    List<dynamic>? cachedEvents = box.get('eventList');
-    if (cachedEvents != null) {
-      setState(() {
-        eventList = List<Map<String, dynamic>>.from(cachedEvents);
-      });
-    }
+    List<Map<String, dynamic>> cachedEvents = await DatabaseHelper.instance.getEvents();
+    setState(() {
+      eventList = cachedEvents;
+    });
 
-    // Check internet and fetch latest data if online
+    // Fetch new data from server if online
     if (await _isOnline()) {
       try {
         var response = await http.get(Uri.parse(apiUrl));
@@ -50,11 +43,20 @@ class _EventsScreenState extends State<EventsScreen> {
         if (response.statusCode == 200) {
           List<dynamic> events = jsonDecode(response.body);
 
-          // Store new data in Hive
-          box.put('eventList', events);
+          // Store new data in SQLite
+          for (var event in events) {
+            DatabaseHelper.instance.insertEvent({
+              "_id": event["_id"],
+              "name": event["name"],
+              "time": event["time"],
+              "location": event["location"],
+              "date": event["date"],
+              "isSynced": 1, // Mark as synced
+            });
+          }
 
           setState(() {
-            eventList = List<Map<String, dynamic>>.from(events);
+            eventList = events.map((e) => Map<String, dynamic>.from(e)).toList();
           });
         }
       } catch (e) {
@@ -65,23 +67,21 @@ class _EventsScreenState extends State<EventsScreen> {
 
   /// Save event locally first, then sync when online
   Future<void> _saveEvent(String name, String time, String location, String date) async {
-    final box = Hive.box('events');
-
     Map<String, dynamic> newEvent = {
       "_id": DateTime.now().toString(), // Temporary ID
       "name": name,
       "time": time,
       "location": location,
       "date": date,
-      "isSynced": false // Mark as not synced
+      "isSynced": 0 // Mark as not synced
     };
+
+    // Save event locally in SQLite
+    await DatabaseHelper.instance.insertEvent(newEvent);
 
     setState(() {
       eventList.add(newEvent);
     });
-
-    // Save to Hive
-    box.put('eventList', eventList);
 
     // Sync if online
     if (await _isOnline()) {
@@ -106,16 +106,8 @@ class _EventsScreenState extends State<EventsScreen> {
       if (response.statusCode == 201) {
         print("✅ Event synced successfully!");
 
-        // Update Hive data to mark as synced
-        final box = Hive.box('events');
-        eventList = eventList.map((e) {
-          if (e["_id"] == event["_id"]) {
-            return {...e, "isSynced": true};
-          }
-          return e;
-        }).toList();
-
-        box.put('eventList', eventList);
+        // Update SQLite data to mark as synced
+        await DatabaseHelper.instance.updateEventSyncStatus(event["_id"], true);
       }
     } catch (e) {
       print("❌ Error syncing event: $e");

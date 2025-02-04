@@ -1,9 +1,7 @@
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:hive/hive.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:medapp/dbhelper/database_helper2.dart';
 
 class MarkAttendanceScreen extends StatefulWidget {
   final String eventId;
@@ -17,34 +15,28 @@ class MarkAttendanceScreen extends StatefulWidget {
 }
 
 class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
-  late Box attendanceBox;
-  late Box studentBox;
+  Map<String, bool> attendanceStatus = {}; // Stores student ID & presence status
+  List<Map<String, dynamic>> students = []; // Stores student list
+  bool isAttendanceSubmitted = false; // Tracks if attendance was submitted
 
-  Map<String, bool> attendanceStatus = {};
-  List<Map<String, dynamic>> students = [];
-  bool isAttendanceSubmitted = false;
-
-
-final String baseUrl = dotenv.env['BASE_URL'] ?? 'http://default-url.com';
+  final String baseUrl = "http://192.168.36.131:5000"; // Update with your API IP
 
   @override
   void initState() {
     super.initState();
-    _initHive();
+    _checkAttendanceSubmissionStatus(); // Check if attendance is already submitted
+    _fetchStudents(); // Load students & attendance when screen opens
   }
 
-  // Initialize Hive and open required boxes
-  Future<void> _initHive() async {
-    final appDir = await getApplicationDocumentsDirectory();
-    Hive.init(appDir.path);
-    attendanceBox = await Hive.openBox('attendance');
-    studentBox = await Hive.openBox('students');
-
-    await _fetchStudents();
-    _loadAttendance();
+  // ✅ Check if attendance has already been submitted
+  Future<void> _checkAttendanceSubmissionStatus() async {
+    bool submitted = await DatabaseHelper2.instance.isAttendanceSubmitted(widget.eventId, widget.eventDate);
+    setState(() {
+      isAttendanceSubmitted = submitted;
+    });
   }
 
-  // Fetch students from API and save to Hive for offline access
+  // ✅ Fetch students from API or SQLite (if offline)
   Future<void> _fetchStudents() async {
     final url = Uri.parse("$baseUrl/students");
     try {
@@ -52,49 +44,70 @@ final String baseUrl = dotenv.env['BASE_URL'] ?? 'http://default-url.com';
       if (response.statusCode == 200) {
         List<dynamic> data = json.decode(response.body);
         setState(() {
-          students = data.cast<Map<String, dynamic>>();
+          students = data.map((student) => {
+            "id": student["_id"],
+            "name": student["name"],
+          }).toList();
         });
 
-        // Store students in Hive
-        studentBox.put("students_data", students);
+        // Store students in SQLite for offline access
+        for (var student in students) {
+          await DatabaseHelper2.instance.insertStudent({
+            "id": student["id"],
+            "name": student["name"],
+          });
+        }
+      } else {
+        throw Exception("Failed to fetch students");
       }
     } catch (e) {
       print("⚠️ Error fetching students: $e");
 
-      // Load students from Hive if API request fails (offline mode)
-      var storedStudents = studentBox.get("students_data");
-      if (storedStudents != null) {
-        setState(() {
-          students = List<Map<String, dynamic>>.from(storedStudents);
-        });
-      }
+      // Load students from SQLite if API request fails (offline mode)
+      var storedStudents = await DatabaseHelper2.instance.getStudents();
+      setState(() {
+        students = storedStudents;
+      });
     }
+
+    _loadAttendance(); // Load saved attendance data
   }
 
-  // Load attendance data from Hive
-  void _loadAttendance() {
-    String eventKey = "attendance_${widget.eventId}";
-    var storedData = attendanceBox.get(eventKey);
-
-    if (storedData != null) {
+  // ✅ Load saved attendance from SQLite
+  void _loadAttendance() async {
+    var storedAttendance = await DatabaseHelper2.instance.getAttendance(widget.eventId, widget.eventDate);
+    if (storedAttendance.isNotEmpty) {
       setState(() {
-        attendanceStatus = Map<String, bool>.from(storedData['attendanceData']);
-        isAttendanceSubmitted = storedData['submitted'];
+        for (var attendance in storedAttendance) {
+          if (attendance['id'] != null) {
+            attendanceStatus[attendance['id']] = attendance['present'] == 1;
+          }
+        }
       });
     }
   }
 
-  // Save attendance locally for offline use
-  void _saveAttendanceLocally() {
-    String eventKey = "attendance_${widget.eventId}";
-    attendanceBox.put(eventKey, {
-      "attendanceData": attendanceStatus,
-      "submitted": isAttendanceSubmitted,
-    });
+  // ✅ Save attendance locally in SQLite
+  void _saveAttendanceLocally({required bool isSynced}) async {
+    for (var studentId in attendanceStatus.keys) {
+      await DatabaseHelper2.instance.insertAttendance({
+        "id": studentId,
+        "eventId": widget.eventId,
+        "eventDate": widget.eventDate,
+        "present": attendanceStatus[studentId]! ? 1 : 0,
+        "isSynced": isSynced ? 1 : 0,
+        "isSubmitted": isAttendanceSubmitted ? 1 : 0, // Include submission status
+      });
+    }
   }
 
-  // Submit attendance to server and save locally
+  // ✅ Submit attendance to the server
   Future<void> _submitAttendance() async {
+    if (isAttendanceSubmitted) {
+      print("Attendance already submitted!");
+      return;
+    }
+
     final url = Uri.parse("$baseUrl/attendance/submit");
 
     List<Map<String, dynamic>> attendanceList = attendanceStatus.entries.map((entry) {
@@ -109,7 +122,10 @@ final String baseUrl = dotenv.env['BASE_URL'] ?? 'http://default-url.com';
       final response = await http.post(
         url,
         headers: {"Content-Type": "application/json"},
-        body: json.encode({"eventId": widget.eventId, "attendanceData": attendanceList}),
+        body: json.encode({
+          "eventId": widget.eventId,
+          "attendanceData": attendanceList,
+        }),
       );
 
       if (response.statusCode == 200) {
@@ -118,7 +134,11 @@ final String baseUrl = dotenv.env['BASE_URL'] ?? 'http://default-url.com';
           isAttendanceSubmitted = true;
         });
 
-        _saveAttendanceLocally(); // Save attendance in Hive
+        // Mark attendance as submitted in the local database
+        await DatabaseHelper2.instance.markAttendanceAsSubmitted(widget.eventId, widget.eventDate);
+
+        // Save attendance locally with isSubmitted = true
+        _saveAttendanceLocally(isSynced: true);
 
         Future.delayed(Duration(seconds: 1), () {
           Navigator.pop(context);
@@ -126,6 +146,7 @@ final String baseUrl = dotenv.env['BASE_URL'] ?? 'http://default-url.com';
       }
     } catch (e) {
       print("❌ Error submitting attendance: $e");
+      _saveAttendanceLocally(isSynced: false);
     }
   }
 
@@ -150,12 +171,29 @@ final String baseUrl = dotenv.env['BASE_URL'] ?? 'http://default-url.com';
             ),
             SizedBox(height: 10),
             Expanded(child: _buildStudentList()),
+
+            // ✅ Show a message if attendance is already submitted
+            if (isAttendanceSubmitted)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16.0),
+                child: Text(
+                  "Attendance Already Submitted",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+              ),
+
+            // ✅ Hide submit button if attendance is already submitted
             if (!isAttendanceSubmitted)
               ElevatedButton(
                 onPressed: _submitAttendance,
                 child: Text("Submit Attendance"),
                 style: ElevatedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(vertical: 16), backgroundColor: Colors.blue,
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  backgroundColor: Colors.blue,
                   textStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -174,8 +212,8 @@ final String baseUrl = dotenv.env['BASE_URL'] ?? 'http://default-url.com';
       itemCount: students.length,
       itemBuilder: (context, index) {
         var student = students[index];
-        String studentId = student["_id"];
-        String studentName = student["name"];
+        String studentId = student["id"] ?? "";
+        String studentName = student["name"] ?? "Unknown Student";
         bool isPresent = attendanceStatus[studentId] ?? false;
 
         return _studentAttendanceTile(studentName, index + 1, isPresent, studentId);
@@ -197,28 +235,34 @@ final String baseUrl = dotenv.env['BASE_URL'] ?? 'http://default-url.com';
     );
   }
 
+  // ✅ Updated Checkbox Logic (Disables checkboxes after submission)
   Widget _studentAttendanceTile(String name, int rollNo, bool isPresent, String studentId) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: ListTile(
         leading: Checkbox(
-          value: isPresent,
-          onChanged: isAttendanceSubmitted ? null : (bool? newValue) {
-            setState(() {
-              attendanceStatus[studentId] = newValue ?? false;
-              _saveAttendanceLocally(); // Save instantly on change
-            });
-          },
+          value: attendanceStatus[studentId] ?? false,
+          onChanged: isAttendanceSubmitted
+              ? null // ✅ Disable checkbox if attendance is already submitted
+              : (bool? newValue) {
+                  setState(() {
+                    attendanceStatus[studentId] = newValue ?? false;
+                  });
+                  _saveAttendanceLocally(isSynced: false);
+                },
         ),
         title: Text(name, style: TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text("Roll No: $rollNo"),
         trailing: Container(
           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: isPresent ? Colors.green : Colors.red,
+            color: (attendanceStatus[studentId] ?? false) ? Colors.green : Colors.red,
             borderRadius: BorderRadius.circular(5),
           ),
-          child: Text(isPresent ? "Present" : "Absent", style: TextStyle(color: Colors.white)),
+          child: Text(
+            (attendanceStatus[studentId] ?? false) ? "Present" : "Absent",
+            style: TextStyle(color: Colors.white),
+          ),
         ),
       ),
     );
