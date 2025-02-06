@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:medapp/constants.dart';
 import 'package:medapp/dbhelper/database_helper.dart';
 import 'dart:convert';
 import 'package:medapp/pages/mark_attendance.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-
+import 'package:intl/intl.dart';
 
 class EventsScreen extends StatefulWidget {
   @override
@@ -12,7 +13,7 @@ class EventsScreen extends StatefulWidget {
 }
 
 class _EventsScreenState extends State<EventsScreen> {
-  final String apiUrl = "http://192.168.36.131:5000/events";
+  final String apiUrl = "http://192.168.229.131:5000/events";
   List<Map<String, dynamic>> eventList = [];
 
   // Controllers for text fields
@@ -27,8 +28,7 @@ class _EventsScreenState extends State<EventsScreen> {
     _fetchEvents();
   }
 
-  /// Fetch events from API or load cached data from SQLite
-  Future<void> _fetchEvents() async {
+   Future<void> _fetchEvents() async {
     // Load cached events first
     List<Map<String, dynamic>> cachedEvents = await DatabaseHelper.instance.getEvents();
     setState(() {
@@ -44,16 +44,21 @@ class _EventsScreenState extends State<EventsScreen> {
           List<dynamic> events = jsonDecode(response.body);
 
           // Store new data in SQLite
-          for (var event in events) {
-            DatabaseHelper.instance.insertEvent({
-              "_id": event["_id"],
-              "name": event["name"],
-              "time": event["time"],
-              "location": event["location"],
-              "date": event["date"],
-              "isSynced": 1, // Mark as synced
-            });
-          }
+          // Store new data in SQLite if not already present
+for (var event in events) {
+  bool exists = await DatabaseHelper.instance.eventExists(event["_id"]);
+  if (!exists) {
+    await DatabaseHelper.instance.insertEvent({
+      "_id": event["_id"],
+      "name": event["name"],
+      "time": event["time"],
+      "location": event["location"],
+      "date": event["date"],
+      "isSynced": 1, // Mark as synced
+    });
+  }
+}
+
 
           setState(() {
             eventList = events.map((e) => Map<String, dynamic>.from(e)).toList();
@@ -65,31 +70,31 @@ class _EventsScreenState extends State<EventsScreen> {
     }
   }
 
-  /// Save event locally first, then sync when online
   Future<void> _saveEvent(String name, String time, String location, String date) async {
-    Map<String, dynamic> newEvent = {
-      "_id": DateTime.now().toString(), // Temporary ID
-      "name": name,
-      "time": time,
-      "location": location,
-      "date": date,
-      "isSynced": 0 // Mark as not synced
-    };
+  String eventId = DateTime.now().toString();
 
-    // Save event locally in SQLite
-    await DatabaseHelper.instance.insertEvent(newEvent);
+  bool exists = await DatabaseHelper.instance.eventExists(eventId);
+  if (exists) return; // Prevent duplicate insertion
 
-    setState(() {
-      eventList.add(newEvent);
-    });
+  Map<String, dynamic> newEvent = {
+    "_id": eventId,
+    "name": name,
+    "time": time,
+    "location": location,
+    "date": date,
+    "isSynced": 0
+  };
+  await DatabaseHelper.instance.insertEvent(newEvent);
+  setState(() {
+    eventList.add(newEvent);
+  });
 
-    // Sync if online
-    if (await _isOnline()) {
-      _syncEventWithServer(newEvent);
-    }
+  if (await _isOnline()) {
+    _syncEventWithServer(newEvent);
   }
+}
 
-  /// Sync event with MongoDB
+
   Future<void> _syncEventWithServer(Map<String, dynamic> event) async {
     try {
       var response = await http.post(
@@ -102,46 +107,104 @@ class _EventsScreenState extends State<EventsScreen> {
           "date": event["date"],
         }),
       );
-
       if (response.statusCode == 201) {
-        print("✅ Event synced successfully!");
-
-        // Update SQLite data to mark as synced
+        print(" Event synced successfully!");
         await DatabaseHelper.instance.updateEventSyncStatus(event["_id"], true);
       }
     } catch (e) {
-      print("❌ Error syncing event: $e");
+      print(" Error syncing event: $e");
     }
   }
 
-  /// Check if the device is online
   Future<bool> _isOnline() async {
     var connectivityResult = await Connectivity().checkConnectivity();
     return connectivityResult != ConnectivityResult.none;
   }
 
-  /// Show dialog to add an event
   void _addEvent() {
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text("Create New Event"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: nameController, decoration: InputDecoration(labelText: "Event Name")),
-              TextField(controller: timeController, decoration: InputDecoration(labelText: "Time")),
-              TextField(controller: locationController, decoration: InputDecoration(labelText: "Location")),
-              TextField(controller: dateController, decoration: InputDecoration(labelText: "Date (YYYY-MM-DD)"), keyboardType: TextInputType.datetime),
-            ],
+          title: Text("Create New Event",
+              style: TextStyle(fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: TextFormField(
+                    controller: nameController,
+                    decoration: InputDecoration(
+                      labelText: "Event Name",
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: TextFormField(
+                    controller: timeController,
+                    decoration: InputDecoration(
+                      labelText: "Time",
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: TextFormField(
+                    controller: locationController,
+                    decoration: InputDecoration(
+                      labelText: "Location",
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: TextFormField(
+                    controller: dateController,
+                    decoration: InputDecoration(
+                      labelText: "Date",
+                      border: OutlineInputBorder(),
+                      suffixIcon: Icon(Icons.calendar_today),
+                    ),
+                    readOnly: true,
+                    onTap: () async {
+                      DateTime initialDate = DateTime.now();
+                      DateTime firstDate = DateTime.now(); // Disable past dates
+                      DateTime lastDate = DateTime(2101);
+                      DateTime? picked = await showDatePicker(
+                        context: context,
+                        initialDate: initialDate,
+                        firstDate: firstDate,
+                        lastDate: lastDate,
+                      );
+                      if (picked != null && picked != initialDate) {
+                        setState(() {
+                          dateController.text =
+                              DateFormat('yyyy-MM-dd').format(picked);
+                        });
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: Text("Cancel")),
+            TextButton(
+                onPressed: () => Navigator.pop(context), child: Text("Cancel")),
             ElevatedButton(
               onPressed: () {
-                if (nameController.text.isNotEmpty && timeController.text.isNotEmpty && locationController.text.isNotEmpty && dateController.text.isNotEmpty) {
-                  _saveEvent(nameController.text, timeController.text, locationController.text, dateController.text);
+                if (nameController.text.isNotEmpty &&
+                    timeController.text.isNotEmpty &&
+                    locationController.text.isNotEmpty &&
+                    dateController.text.isNotEmpty) {
+                  _saveEvent(nameController.text, timeController.text,
+                      locationController.text, dateController.text);
                   Navigator.pop(context);
                 }
               },
@@ -164,10 +227,6 @@ class _EventsScreenState extends State<EventsScreen> {
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("Upcoming Events", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                TextButton(onPressed: () {}, child: Text("See All")),
-              ],
             ),
             Expanded(
               child: eventList.isEmpty
@@ -180,35 +239,39 @@ class _EventsScreenState extends State<EventsScreen> {
                       },
                     ),
             ),
+
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _addEvent,
         child: Icon(Icons.add),
-        backgroundColor: Colors.blue,
+        backgroundColor: constc,
       ),
     );
   }
 
-  /// Event Tile to display each event
-  Widget _eventTile(String eventId, String name, String time, String location, String date) {
+  Widget _eventTile(String eventId, String name, String time, String location,
+      String date) {
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: ListTile(
-        leading: Icon(Icons.event, color: Colors.blue),
-        title: Text(name, style: TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text("$time | $location | Date: $date"),
-        trailing: Icon(Icons.arrow_forward_ios, size: 18),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MarkAttendanceScreen(eventId: eventId, eventName: name, eventDate: date),
-            ),
-          );
-        },
-      ),
-    );
+        elevation: 5,
+        margin: EdgeInsets.symmetric(vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: ListTile(
+          leading: Icon(Icons.event, color: constc),
+          title: Text(name, style: TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: Text("$location | $time |           Date: $date"),
+          trailing: Icon(Icons.arrow_forward_ios, size: 18),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MarkAttendanceScreen(
+                    eventId: eventId, eventName: name, eventDate: date),
+              ),
+            );
+          },
+        ),
+      );
   }
 }

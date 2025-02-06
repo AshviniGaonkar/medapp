@@ -29,6 +29,12 @@ class DatabaseHelper {
     var path = join(dbPath, _databaseName);
     return await openDatabase(path, version: _databaseVersion, onCreate: _onCreate);
   }
+  // This function checks if the event already exists in SQLite based on its ID.
+Future<bool> eventExists(String eventId) async {
+  var db = await instance.database;
+  var result = await db.query('events', where: '_id = ?', whereArgs: [eventId]);
+  return result.isNotEmpty;
+}
 
   Future _onCreate(Database db, int version) async {
     await db.execute('''
@@ -63,5 +69,7 @@ class DatabaseHelper {
     );
   }
 }
+
+
 
 

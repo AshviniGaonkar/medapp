@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:medapp/constants.dart';
 
 class SideMenu extends StatefulWidget {
   final int selectedIndex;
@@ -50,8 +51,8 @@ class _SideMenuState extends State<SideMenu> {
         }
       } catch (e) {
         setState(() {
-          facultyName = "Error loading name";
-          facultyEmail = "Error loading email";
+          facultyName = "Avishkar";
+          facultyEmail = "gadadeavishkar98@gmail.com";
         });
       }
     }
@@ -65,7 +66,7 @@ class _SideMenuState extends State<SideMenu> {
         children: [
           UserAccountsDrawerHeader(
             decoration: BoxDecoration(
-              color: const Color.fromARGB(255, 10, 168, 212),
+              color: constc
             ),
             accountName: Text(facultyName,
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),),

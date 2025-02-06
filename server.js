@@ -1,7 +1,10 @@
 require("dotenv").config();
-const express = require("express");
-const mongoose = require("mongoose");
-const cors = require("cors");
+mongoose.connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+}).then(() => console.log("MongoDB Atlas Connected"))
+.catch(err => console.error("MongoDB Connection Error:", err));
+
 
 const app = express();
 app.use(cors()); // Allow all origins for development
@@ -17,20 +20,21 @@ app.use((req, res, next) => {
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
-}).then(() => console.log("✅ MongoDB Connected"))
-  .catch(err => console.error("❌ MongoDB Connection Error:", err));
+}).then(() => console.log(" MongoDB Connected"))
+  .catch(err => console.error(" MongoDB Connection Error:", err));
 
 // 🔹 Event Schema
 const eventSchema = new mongoose.Schema({
   name: { type: String, required: true },
   location: { type: String, required: true },
-  time: { type: String, required: true }, // Time in "HH:mm" format
+  time: { type: String, required: true },
   date: { type: Date, required: true },
 });
 
 const studentSchema = new mongoose.Schema({
   name: { type: String, required: true },
-  rollNo: { type: String, required: true, unique: true }
+  rollNo: { type: String, required: true, unique: true },
+  prn: { type: String, required: true, unique: true }
 });
 
 // 🔹 Attendance Schema (Updated)
@@ -63,7 +67,7 @@ app.post('/events', async (req, res) => {
     await event.save();
     res.status(201).json(event);
   } catch (error) {
-    console.error("❌ Error creating event:", error);
+    console.error("Error creating event:", error);
     res.status(500).json({ message: "Failed to create event." });
   }
 });
@@ -74,7 +78,7 @@ app.get("/events", async (req, res) => {
     const events = await Event.find();
     res.json(events);
   } catch (err) {
-    console.error("❌ Error fetching events:", err);
+    console.error(" Error fetching events:", err);
     res.status(500).json({ message: "Failed to fetch events" });
   }
 });
@@ -83,10 +87,10 @@ app.get("/events", async (req, res) => {
 app.get("/students", async (req, res) => {
   try {
     const students = await Student.find();
-    console.log("✅ Students fetched:", students);
+    console.log(" Students fetched:", students);
     res.json(students);
   } catch (err) {
-    console.error("❌ Error fetching students:", err);
+    console.error(" Error fetching students:", err);
     res.status(500).json({ error: "Failed to fetch students" });
   }
 });
@@ -102,10 +106,10 @@ app.get("/attendance/:eventId", async (req, res) => {
       attendanceMap[entry.studentId] = entry.present;
     });
 
-    console.log(`✅ Attendance fetched for Event ${eventId}:`, attendanceMap);
+    console.log(` Attendance fetched for Event ${eventId}:`, attendanceMap);
     res.json(attendanceMap);
   } catch (err) {
-    console.error("❌ Error fetching attendance:", err);
+    console.error(" Error fetching attendance:", err);
     res.status(500).json({ error: "Failed to fetch attendance" });
   }
 });
@@ -123,10 +127,10 @@ app.post("/attendance/:eventId", async (req, res) => {
       { new: true, upsert: true }
     );
 
-    console.log(`✅ Attendance updated: ${studentId} - Present: ${present} on ${eventDate}`);
+    console.log(` Attendance updated: ${studentId} - Present: ${present} on ${eventDate}`);
     res.json({ success: true, data: updatedAttendance });
   } catch (err) {
-    console.error("❌ Error updating attendance:", err);
+    console.error(" Error updating attendance:", err);
     res.status(500).json({ error: "Failed to update attendance" });
   }
 });
@@ -144,7 +148,7 @@ app.post('/attendance/submit', async (req, res) => {
     const existingAttendance = await Attendance.findOne({ eventId, eventDate: attendanceData[0].eventDate, submitted: true });
 
     if (existingAttendance) {
-      return res.status(403).json({ message: "❌ Attendance already submitted for this date. Changes are not allowed!" });
+      return res.status(403).json({ message: " Attendance already submitted for this date. Changes are not allowed!" });
     }
 
     // Prepare attendance records
@@ -157,9 +161,9 @@ app.post('/attendance/submit', async (req, res) => {
     }));
 
     await Attendance.insertMany(attendanceRecords);
-    res.status(200).json({ message: "✅ Attendance submitted successfully!" });
+    res.status(200).json({ message: " Attendance submitted successfully!" });
   } catch (err) {
-    console.error("❌ Error submitting attendance:", err);
+    console.error(" Error submitting attendance:", err);
     res.status(500).json({ message: err.message });
   }
 });
@@ -167,4 +171,6 @@ app.post('/attendance/submit', async (req, res) => {
 // Start the server
 const PORT = process.env.PORT || 5000;
 const HOST = "0.0.0.0"; // Allow external devices to access
-app.listen(PORT, HOST, () => console.log(`Server running on http://${HOST}:${PORT}`));
+app.listen(5000, '0.0.0.0', () => {
+  console.log("Server running on 0.0.0.0:5000");
+});

@@ -19,7 +19,7 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
   List<Map<String, dynamic>> students = []; // Stores student list
   bool isAttendanceSubmitted = false; // Tracks if attendance was submitted
 
-  final String baseUrl = "http://192.168.36.131:5000"; // Update with your API IP
+  final String baseUrl = "http://192.168.229.131:5000"; // Update with your API IP
 
   @override
   void initState() {
@@ -28,7 +28,7 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
     _fetchStudents(); // Load students & attendance when screen opens
   }
 
-  // ✅ Check if attendance has already been submitted
+  //  Check if attendance has already been submitted
   Future<void> _checkAttendanceSubmissionStatus() async {
     bool submitted = await DatabaseHelper2.instance.isAttendanceSubmitted(widget.eventId, widget.eventDate);
     setState(() {
@@ -36,44 +36,46 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
     });
   }
 
-  // ✅ Fetch students from API or SQLite (if offline)
-  Future<void> _fetchStudents() async {
-    final url = Uri.parse("$baseUrl/students");
-    try {
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        List<dynamic> data = json.decode(response.body);
-        setState(() {
-          students = data.map((student) => {
-            "id": student["_id"],
-            "name": student["name"],
-          }).toList();
-        });
-
-        // Store students in SQLite for offline access
-        for (var student in students) {
-          await DatabaseHelper2.instance.insertStudent({
-            "id": student["id"],
-            "name": student["name"],
-          });
-        }
-      } else {
-        throw Exception("Failed to fetch students");
-      }
-    } catch (e) {
-      print("⚠️ Error fetching students: $e");
-
-      // Load students from SQLite if API request fails (offline mode)
-      var storedStudents = await DatabaseHelper2.instance.getStudents();
+  //  Fetch students from API or SQLite (if offline)
+  // Fetch students from API or SQLite (if offline)
+Future<void> _fetchStudents() async {
+  final url = Uri.parse("$baseUrl/students");
+  try {
+    final response = await http.get(url);
+    if (response.statusCode == 200) {
+      List<dynamic> data = json.decode(response.body);
       setState(() {
-        students = storedStudents;
+        students = data.map((student) => {
+          "id": student["_id"],
+          "name": student["name"],
+        }).toList();
       });
-    }
 
-    _loadAttendance(); // Load saved attendance data
+      // Store students in SQLite for offline access
+      for (var student in students) {
+        await DatabaseHelper2.instance.insertStudent({
+          "id": student["id"],
+          "name": student["name"],
+        });
+      }
+    } else {
+      throw Exception("Failed to fetch students");
+    }
+  } catch (e) {
+    print("Error fetching students: $e");
+
+    // Load students from SQLite using eventId
+    var storedStudents = await DatabaseHelper2.instance.getStudentsForEvent(widget.eventId);
+    setState(() {
+      students = storedStudents;
+    });
   }
 
-  // ✅ Load saved attendance from SQLite
+  _loadAttendance(); // Load saved attendance data
+}
+
+
+  //  Load saved attendance from SQLite
   void _loadAttendance() async {
     var storedAttendance = await DatabaseHelper2.instance.getAttendance(widget.eventId, widget.eventDate);
     if (storedAttendance.isNotEmpty) {
@@ -87,7 +89,7 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
     }
   }
 
-  // ✅ Save attendance locally in SQLite
+  //  Save attendance locally in SQLite
   void _saveAttendanceLocally({required bool isSynced}) async {
     for (var studentId in attendanceStatus.keys) {
       await DatabaseHelper2.instance.insertAttendance({
@@ -101,7 +103,7 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
     }
   }
 
-  // ✅ Submit attendance to the server
+  //  Submit attendance to the server
   Future<void> _submitAttendance() async {
     if (isAttendanceSubmitted) {
       print("Attendance already submitted!");
@@ -129,7 +131,7 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
       );
 
       if (response.statusCode == 200) {
-        print("✅ Attendance submitted successfully!");
+        print(" Attendance submitted successfully!");
         setState(() {
           isAttendanceSubmitted = true;
         });
@@ -145,7 +147,7 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
         });
       }
     } catch (e) {
-      print("❌ Error submitting attendance: $e");
+      print(" Error submitting attendance: $e");
       _saveAttendanceLocally(isSynced: false);
     }
   }
@@ -156,11 +158,12 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
     int absentCount = students.length - presentCount;
 
     return Scaffold(
-      appBar: AppBar(title: Text("Mark Attendance - ${widget.eventName}")),
+      appBar: AppBar(title: Text("Mark Attendance - ${widget.eventName}"), backgroundColor: Colors.deepPurple),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
+            // Status row with colorful boxes
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -172,12 +175,12 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
             SizedBox(height: 10),
             Expanded(child: _buildStudentList()),
 
-            // ✅ Show a message if attendance is already submitted
+            // Show a message if attendance is already submitted
             if (isAttendanceSubmitted)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16.0),
                 child: Text(
-                  "Attendance Already Submitted",
+                  "Attendance Submitted",
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -186,15 +189,16 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
                 ),
               ),
 
-            // ✅ Hide submit button if attendance is already submitted
+            // Hide submit button if attendance is already submitted
             if (!isAttendanceSubmitted)
               ElevatedButton(
                 onPressed: _submitAttendance,
                 child: Text("Submit Attendance"),
                 style: ElevatedButton.styleFrom(
                   padding: EdgeInsets.symmetric(vertical: 16),
-                  backgroundColor: Colors.blue,
+                  backgroundColor: Colors.deepPurpleAccent,
                   textStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
           ],
@@ -203,6 +207,26 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
     );
   }
 
+  // A widget for displaying the status boxes (Present/Absent count)
+  Widget _statusBox(String count, String label, Color color) {
+    return Column(
+      children: [
+        Container(
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [BoxShadow(color: color.withOpacity(0.3), spreadRadius: 2, blurRadius: 5)],
+          ),
+          child: Text(count, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+        ),
+        SizedBox(height: 5),
+        Text(label, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+      ],
+    );
+  }
+
+  // Building student list with dynamic presence status
   Widget _buildStudentList() {
     if (students.isEmpty) {
       return Center(child: CircularProgressIndicator());
@@ -221,48 +245,31 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
     );
   }
 
-  Widget _statusBox(String count, String label, Color color) {
-    return Column(
-      children: [
-        Container(
-          padding: EdgeInsets.all(16),
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(10)),
-          child: Text(count, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
-        ),
-        SizedBox(height: 5),
-        Text(label, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-      ],
-    );
-  }
-
-  // ✅ Updated Checkbox Logic (Disables checkboxes after submission)
+  // A widget for displaying the student attendance tile
   Widget _studentAttendanceTile(String name, int rollNo, bool isPresent, String studentId) {
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 4,
+      margin: EdgeInsets.only(bottom: 16),
       child: ListTile(
-        leading: Checkbox(
+        leading: Icon(
+          isPresent ? Icons.check_circle : Icons.cancel,
+          color: isPresent ? Colors.green : Colors.red,
+          size: 28,
+        ),
+        title: Text(name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        subtitle: Text("Roll No: $rollNo", style: TextStyle(fontSize: 14)),
+
+        trailing: Checkbox(
           value: attendanceStatus[studentId] ?? false,
           onChanged: isAttendanceSubmitted
-              ? null // ✅ Disable checkbox if attendance is already submitted
+              ? null // Disable checkbox if attendance is already submitted
               : (bool? newValue) {
                   setState(() {
                     attendanceStatus[studentId] = newValue ?? false;
                   });
                   _saveAttendanceLocally(isSynced: false);
                 },
-        ),
-        title: Text(name, style: TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text("Roll No: $rollNo"),
-        trailing: Container(
-          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: (attendanceStatus[studentId] ?? false) ? Colors.green : Colors.red,
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: Text(
-            (attendanceStatus[studentId] ?? false) ? "Present" : "Absent",
-            style: TextStyle(color: Colors.white),
-          ),
         ),
       ),
     );

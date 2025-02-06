@@ -3,11 +3,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:medapp/constant/bottom_nav_bar.dart';
 import 'package:medapp/constant/side_menu.dart';
+import 'package:medapp/constants.dart';
 import 'package:medapp/pages/attendance_page.dart';
 import 'package:medapp/pages/dashboard_screen.dart';
 import 'package:medapp/pages/events_page.dart';
 import 'package:medapp/pages/home_page.dart';
-
 
 class MainScreen extends StatefulWidget {
   @override
@@ -15,15 +15,15 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
- int _selectedIndex = 0;
+  int _selectedIndex = 0;
   User? user = FirebaseAuth.instance.currentUser;
   String facultyName = "Loading...";
 
   final List<Widget> _pages = [
-    HomeScreen(),  
-    EventsScreen(),  
+    HomeScreen(),
+    EventsScreen(),
     AttendanceScreen(),
-    DashboardScreen(), 
+    DashboardScreen(),
   ];
 
   @override
@@ -64,12 +64,13 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color.fromARGB(255, 10, 168, 212),
+        backgroundColor: constc,
         shadowColor: Colors.black,
-        title: Text("Smart Systems",
-        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+        title: Text(
+          "Smart Systems",
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
         ),
-        ),
+      ),
       drawer: SideMenu(
         selectedIndex: _selectedIndex,
         onTabChange: _onTabChange,

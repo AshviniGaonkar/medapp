@@ -62,9 +62,15 @@ class DatabaseHelper2 {
   }
   
   Future<List<Map<String, dynamic>>> getStudentsForEvent(String eventId) async {
-  final db = await database;
-  return await db.query("students", where: "eventId = ?", whereArgs: [eventId]);
+  Database db = await database;
+  return await db.rawQuery('''
+    SELECT s.id, s.name
+    FROM students s
+    JOIN attendance a ON s.id = a.id
+    WHERE a.eventId = ?
+  ''', [eventId]);
 }
+
 
 
   // Insert attendance into the attendance table
@@ -129,3 +135,4 @@ class DatabaseHelper2 {
     );
   }
 }
+
