@@ -19,7 +19,7 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
   List<Map<String, dynamic>> students = []; // Stores student list
   bool isAttendanceSubmitted = false; // Tracks if attendance was submitted
 
-  final String baseUrl = "http://192.168.229.131:5000"; // Update with your API IP
+  final String baseUrl = "http://44.226.145.213:5000"; // Update with your API IP
 
   @override
   void initState() {
