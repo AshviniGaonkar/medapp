@@ -14,24 +14,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Smart Systems'),
-        backgroundColor: Colors.blueAccent,
-        actions: [
-          CircleAvatar(
-            backgroundColor: Colors.white,
-            child: Icon(Icons.person, color: Colors.blueAccent),
-          ),
-          SizedBox(width: 10),
-        ],
-      ),
       body: SingleChildScrollView(
-        // Wrap the entire body in SingleChildScrollView
         padding: EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Search bar and dropdown for year and month selection
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -192,30 +179,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ],
         ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        selectedItemColor: Colors.blueAccent,
-        unselectedItemColor: Colors.black54,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today),
-            label: 'Attendance',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
-        ],
-        currentIndex: 3, // Set to the dashboard tab
-        onTap: (index) {},
       ),
     );
   }

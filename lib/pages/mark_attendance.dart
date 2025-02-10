@@ -19,7 +19,7 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
   List<Map<String, dynamic>> students = []; // Stores student list
   bool isAttendanceSubmitted = false; // Tracks if attendance was submitted
 
-  final String baseUrl = "https://medapp-djtm.onrender.com:5000"; 
+  final String baseUrl = "https://medapp-djtm.onrender.com"; 
 
   @override
   void initState() {
@@ -36,7 +36,6 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
     });
   }
 
-  //  Fetch students from API or SQLite (if offline)
   // Fetch students from API or SQLite (if offline)
 Future<void> _fetchStudents() async {
   final url = Uri.parse("$baseUrl/students");

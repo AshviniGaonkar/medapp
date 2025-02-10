@@ -66,10 +66,10 @@ class DatabaseHelper2 {
   return await db.rawQuery('''
     SELECT s.id, s.name
     FROM students s
-    JOIN attendance a ON s.id = a.id
-    WHERE a.eventId = ?
+    LEFT JOIN attendance a ON s.id = a.id AND a.eventId = ?
   ''', [eventId]);
 }
+
 
 
 
