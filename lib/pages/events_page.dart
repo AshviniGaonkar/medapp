@@ -13,7 +13,7 @@ class EventsScreen extends StatefulWidget {
 }
 
 class _EventsScreenState extends State<EventsScreen> {
-  final String apiUrl = "https://medapp-na6j.onrender.com:5000/events";
+  final String apiUrl = "http://192.168.86.131:5000/events";
   List<Map<String, dynamic>> eventList = [];
 
   // Controllers for text fields

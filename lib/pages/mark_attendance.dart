@@ -19,7 +19,7 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
   List<Map<String, dynamic>> students = []; // Stores student list
   bool isAttendanceSubmitted = false; // Tracks if attendance was submitted
 
-  final String baseUrl = "https://medapp-na6j.onrender.com:5000"; 
+  final String baseUrl = "http://192.168.86.131:5000"; 
 
   @override
   void initState() {
@@ -51,7 +51,7 @@ Future<void> _fetchStudents() async {
         }).toList();
       });
 
-      // Store students in SQLite for offline access
+      // Store in SQLite
       for (var student in students) {
         await DatabaseHelper2.instance.insertStudent({
           "id": student["id"],
@@ -64,15 +64,19 @@ Future<void> _fetchStudents() async {
   } catch (e) {
     print("Error fetching students: $e");
 
-    // Load students from SQLite using eventId
+    // Load from SQLite when API fails
     var storedStudents = await DatabaseHelper2.instance.getStudentsForEvent(widget.eventId);
+    
     setState(() {
       students = storedStudents;
     });
+
+    print("Loaded students from SQLite: ${students.length}");
   }
 
-  _loadAttendance(); // Load saved attendance data
+  _loadAttendance();
 }
+
 
 
   //  Load saved attendance from SQLite
