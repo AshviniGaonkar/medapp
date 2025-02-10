@@ -19,7 +19,7 @@ class _MarkAttendanceScreenState extends State<MarkAttendanceScreen> {
   List<Map<String, dynamic>> students = []; // Stores student list
   bool isAttendanceSubmitted = false; // Tracks if attendance was submitted
 
-  final String baseUrl = "http://192.168.86.131:5000"; 
+  final String baseUrl = "https://medapp-djtm.onrender.com:5000"; 
 
   @override
   void initState() {
