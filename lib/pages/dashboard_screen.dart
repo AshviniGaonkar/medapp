@@ -89,7 +89,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 itemBuilder: (context, index) {
                   return Padding(
                     padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: Container(
+                    child: SizedBox(
                       width: 150,
                       child: Card(
                         elevation: 4,

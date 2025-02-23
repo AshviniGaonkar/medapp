@@ -9,7 +9,7 @@ class SignUpForm extends StatelessWidget {
   final bool isLoading;
   final VoidCallback onSignUp;
 
-  const SignUpForm({
+  const SignUpForm({super.key, 
     required this.formKey,
     required this.nameController,
     required this.emailController,
@@ -107,11 +107,11 @@ class SignUpForm extends StatelessWidget {
               ? CircularProgressIndicator()
               : ElevatedButton(
                   onPressed: onSignUp,
-                  child: Text("Sign Up"),
                   style: ElevatedButton.styleFrom(
                     padding: EdgeInsets.symmetric(vertical: 12, horizontal: 24),
                     textStyle: TextStyle(fontSize: 16),
                   ),
+                  child: Text("Sign Up"),
                 ),
           SizedBox(height: 10),
 

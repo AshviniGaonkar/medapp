@@ -8,6 +8,8 @@ import 'package:medapp/responsive.dart';
 
 
 class SignUpScreen extends StatefulWidget {
+  const SignUpScreen({super.key});
+
   @override
   _SignUpScreenState createState() => _SignUpScreenState();
 }
@@ -114,7 +116,7 @@ class MobileSignupScreen extends StatelessWidget {
   final bool isLoading;
   final VoidCallback onSignUp;
 
-  const MobileSignupScreen({
+  const MobileSignupScreen({super.key, 
     required this.formKey,
     required this.nameController,
     required this.emailController,

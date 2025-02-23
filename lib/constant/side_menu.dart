@@ -8,10 +8,10 @@ class SideMenu extends StatefulWidget {
   final Function(int) onTabChange;
 
   const SideMenu({
-    Key? key,
+    super.key,
     required this.selectedIndex,
     required this.onTabChange,
-  }) : super(key: key);
+  });
   
 
   @override

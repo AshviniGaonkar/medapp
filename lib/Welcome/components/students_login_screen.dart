@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class StudentLoginScreen extends StatefulWidget {
+  const StudentLoginScreen({super.key});
+
   @override
   _StudentLoginScreenState createState() => _StudentLoginScreenState();
 }
@@ -95,13 +97,13 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                           onPressed: () => {
                             Navigator.pushReplacementNamed(context, "/attendance"),
                           },
-                          child: Text("Login"),
                           style: ElevatedButton.styleFrom(
                             padding: EdgeInsets.symmetric(
                                 vertical: 12, horizontal: 24),
                             textStyle: TextStyle(fontSize: 16),
                         
                           ),
+                          child: Text("Login"),
                         ),
                 ],
               ),

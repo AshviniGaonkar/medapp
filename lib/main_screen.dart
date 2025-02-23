@@ -10,6 +10,8 @@ import 'package:medapp/pages/events_page.dart';
 import 'package:medapp/pages/home_page.dart';
 
 class MainScreen extends StatefulWidget {
+  const MainScreen({super.key});
+
   @override
   _MainScreenState createState() => _MainScreenState();
 }

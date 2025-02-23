@@ -7,7 +7,7 @@ class LoginForm extends StatelessWidget {
   final bool isLoading;
   final VoidCallback onLogin;
 
-  const LoginForm({
+  const LoginForm({super.key, 
     required this.formKey,
     required this.emailController,
     required this.passwordController,
@@ -61,10 +61,10 @@ class LoginForm extends StatelessWidget {
               ? CircularProgressIndicator()
               : ElevatedButton(
                   onPressed: onLogin,
-                  child: Text("Login"),
                   style: ElevatedButton.styleFrom(
                     padding: EdgeInsets.symmetric(vertical: 12, horizontal: 24),
                   ),
+                  child: Text("Login"),
                 ),
           SizedBox(height: 10),
           TextButton(

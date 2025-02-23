@@ -6,11 +6,13 @@ import 'package:medapp/components/background.dart';
 import 'package:medapp/responsive.dart';
 
 class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
   @override
-  _LoginScreenState createState() => _LoginScreenState();
+  LoginScreenState createState() => LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class LoginScreenState extends State<LoginScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
@@ -22,7 +24,9 @@ class _LoginScreenState extends State<LoginScreen> {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.pushReplacementNamed(context, "/Main");
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, "/Main");
+        }
       });
     }
   }
@@ -39,15 +43,21 @@ class _LoginScreenState extends State<LoginScreen> {
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
-      Navigator.pushReplacementNamed(context, "/Main");
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, "/Main");
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -95,7 +105,7 @@ class MobileLoginScreen extends StatelessWidget {
   final bool isLoading;
   final VoidCallback onLogin;
 
-  const MobileLoginScreen({
+  const MobileLoginScreen({super.key, 
     required this.formKey,
     required this.emailController,
     required this.passwordController,
